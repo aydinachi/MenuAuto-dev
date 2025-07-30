@@ -116,5 +116,5 @@ The application is configured for Vercel deployment with:
 - API route handling
 
 ## 📞 Support
-
+Virtix-dev.com
 For issues and questions, please check the documentation or create an issue in the repository. 
