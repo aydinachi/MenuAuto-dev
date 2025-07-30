@@ -8,11 +8,10 @@ const router = express.Router();
 // Get all users (admin only)
 router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const [users] = await db.execute(
+    const result = await db.query(
       'SELECT id, username, full_name, role, created_at FROM users ORDER BY role, full_name'
     );
-    
-    res.json({ users });
+    res.json({ users: result.rows });
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -22,18 +21,16 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 // Get user by ID
 router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    const [users] = await db.execute(
-      'SELECT id, username, full_name, role, created_at FROM users WHERE id = ?',
-      [id]
+    const result = await db.query(
+      'SELECT id, username, full_name, role, created_at FROM users WHERE id = $1',
+      [req.params.id]
     );
 
-    if (users.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user: users[0] });
+    res.json({ user: result.rows[0] });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -53,33 +50,32 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    // Check if username already exists
-    const [existingUsers] = await db.execute(
-      'SELECT id FROM users WHERE username = ?',
+    const existing = await db.query(
+      'SELECT id FROM users WHERE username = $1',
       [username]
     );
 
-    if (existingUsers.length > 0) {
+    if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const [result] = await db.execute(
-      'INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)',
+    const insertResult = await db.query(
+      'INSERT INTO users (username, password, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id',
       [username, hashedPassword, full_name, role]
     );
 
-    const [newUser] = await db.execute(
-      'SELECT id, username, full_name, role, created_at FROM users WHERE id = ?',
-      [result.insertId]
+    const userId = insertResult.rows[0].id;
+
+    const userResult = await db.query(
+      'SELECT id, username, full_name, role, created_at FROM users WHERE id = $1',
+      [userId]
     );
 
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'User created successfully',
-      user: newUser[0]
+      user: userResult.rows[0]
     });
   } catch (error) {
     console.error('Create user error:', error);
@@ -90,8 +86,8 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 // Update user (admin only)
 router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
     const { username, full_name, role } = req.body;
+    const { id } = req.params;
 
     if (!username || !full_name || !role) {
       return res.status(400).json({ error: 'Username, full name and role are required' });
@@ -101,40 +97,37 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    // Check if user exists
-    const [existingUsers] = await db.execute(
-      'SELECT id FROM users WHERE id = ?',
+    const userCheck = await db.query(
+      'SELECT id FROM users WHERE id = $1',
       [id]
     );
 
-    if (existingUsers.length === 0) {
+    if (userCheck.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if username already exists (excluding current user)
-    const [duplicateUsers] = await db.execute(
-      'SELECT id FROM users WHERE username = ? AND id != ?',
+    const duplicateCheck = await db.query(
+      'SELECT id FROM users WHERE username = $1 AND id != $2',
       [username, id]
     );
 
-    if (duplicateUsers.length > 0) {
+    if (duplicateCheck.rows.length > 0) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    // Update user
-    await db.execute(
-      'UPDATE users SET username = ?, full_name = ?, role = ? WHERE id = ?',
+    await db.query(
+      'UPDATE users SET username = $1, full_name = $2, role = $3 WHERE id = $4',
       [username, full_name, role, id]
     );
 
-    const [updatedUser] = await db.execute(
-      'SELECT id, username, full_name, role, created_at FROM users WHERE id = ?',
+    const updated = await db.query(
+      'SELECT id, username, full_name, role, created_at FROM users WHERE id = $1',
       [id]
     );
 
-    res.json({ 
+    res.json({
       message: 'User updated successfully',
-      user: updatedUser[0]
+      user: updated.rows[0]
     });
   } catch (error) {
     console.error('Update user error:', error);
@@ -147,41 +140,36 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if user exists
-    const [existingUsers] = await db.execute(
-      'SELECT id, role FROM users WHERE id = ?',
+    const existing = await db.query(
+      'SELECT id, role FROM users WHERE id = $1',
       [id]
     );
 
-    if (existingUsers.length === 0) {
+    if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Prevent deleting the last admin
-    if (existingUsers[0].role === 'admin') {
-      const [adminCount] = await db.execute(
-        'SELECT COUNT(*) as count FROM users WHERE role = "admin"'
+    if (existing.rows[0].role === 'admin') {
+      const adminCount = await db.query(
+        `SELECT COUNT(*) AS count FROM users WHERE role = 'admin'`
       );
-
-      if (adminCount[0].count <= 1) {
+      if (parseInt(adminCount.rows[0].count) <= 1) {
         return res.status(400).json({ error: 'Cannot delete the last admin user' });
       }
     }
 
-    // Check if user has active orders
-    const [activeOrders] = await db.execute(
-      'SELECT COUNT(*) as count FROM orders WHERE waiter_id = ? AND status NOT IN ("served", "cancelled")',
+    const activeOrders = await db.query(
+      `SELECT COUNT(*) AS count FROM orders WHERE waiter_id = $1 AND status NOT IN ('served', 'cancelled')`,
       [id]
     );
 
-    if (activeOrders[0].count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete user with active orders. Complete or cancel their orders first.' 
+    if (parseInt(activeOrders.rows[0].count) > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete user with active orders. Complete or cancel their orders first.'
       });
     }
 
-    // Delete user
-    await db.execute('DELETE FROM users WHERE id = ?', [id]);
+    await db.query('DELETE FROM users WHERE id = $1', [id]);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -200,22 +188,19 @@ router.patch('/:id/reset-password', authenticateToken, requireAdmin, async (req,
       return res.status(400).json({ error: 'New password is required' });
     }
 
-    // Check if user exists
-    const [existingUsers] = await db.execute(
-      'SELECT id FROM users WHERE id = ?',
+    const existing = await db.query(
+      'SELECT id FROM users WHERE id = $1',
       [id]
     );
 
-    if (existingUsers.length === 0) {
+    if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password
-    await db.execute(
-      'UPDATE users SET password = ? WHERE id = ?',
+    await db.query(
+      'UPDATE users SET password = $1 WHERE id = $2',
       [hashedPassword, id]
     );
 
@@ -235,12 +220,12 @@ router.get('/role/:role', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    const [users] = await db.execute(
-      'SELECT id, username, full_name, role, created_at FROM users WHERE role = ? ORDER BY full_name',
+    const result = await db.query(
+      'SELECT id, username, full_name, role, created_at FROM users WHERE role = $1 ORDER BY full_name',
       [role]
     );
-    
-    res.json({ users });
+
+    res.json({ users: result.rows });
   } catch (error) {
     console.error('Get users by role error:', error);
     res.status(500).json({ error: 'Internal server error' });

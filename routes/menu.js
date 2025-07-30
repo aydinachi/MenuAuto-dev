@@ -8,30 +8,30 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { category, subcategory, available } = req.query;
-    
+
     let query = 'SELECT * FROM menu_items WHERE 1=1';
     const params = [];
 
     if (category) {
-      query += ' AND category = ?';
       params.push(category);
+      query += ` AND category = $${params.length}`;
     }
 
     if (subcategory) {
-      query += ' AND subcategory = ?';
       params.push(subcategory);
+      query += ` AND subcategory = $${params.length}`;
     }
 
     if (available !== undefined) {
-      query += ' AND is_available = ?';
       params.push(available === 'true');
+      query += ` AND is_available = $${params.length}`;
     }
 
     query += ' ORDER BY category, subcategory, name';
 
-    const [items] = await db.execute(query, params);
-    
-    res.json({ items });
+    const result = await db.query(query, params);
+
+    res.json({ items: result.rows });
   } catch (error) {
     console.error('Get menu items error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -42,17 +42,17 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const [items] = await db.execute(
-      'SELECT * FROM menu_items WHERE id = ?',
+
+    const result = await db.query(
+      'SELECT * FROM menu_items WHERE id = $1',
       [id]
     );
 
-    if (items.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    res.json({ item: items[0] });
+    res.json({ item: result.rows[0] });
   } catch (error) {
     console.error('Get menu item error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -62,22 +62,21 @@ router.get('/:id', async (req, res) => {
 // Get menu categories
 router.get('/categories/list', async (req, res) => {
   try {
-    const [categories] = await db.execute(
+    const result = await db.query(
       'SELECT DISTINCT category, subcategory FROM menu_items WHERE is_available = true ORDER BY category, subcategory'
     );
 
-    // Group by category
-    const groupedCategories = categories.reduce((acc, item) => {
-      if (!acc[item.category]) {
-        acc[item.category] = [];
-      }
-      if (!acc[item.category].includes(item.subcategory)) {
-        acc[item.category].push(item.subcategory);
+    const categories = result.rows;
+
+    const grouped = categories.reduce((acc, row) => {
+      if (!acc[row.category]) acc[row.category] = [];
+      if (!acc[row.category].includes(row.subcategory)) {
+        acc[row.category].push(row.subcategory);
       }
       return acc;
     }, {});
 
-    res.json({ categories: groupedCategories });
+    res.json({ categories: grouped });
   } catch (error) {
     console.error('Get categories error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -97,19 +96,17 @@ router.post('/', authenticateToken, requireStaff, async (req, res) => {
       return res.status(400).json({ error: 'Category must be either "food" or "drink"' });
     }
 
-    const [result] = await db.execute(
-      'INSERT INTO menu_items (name, description, price, category, subcategory, image_url) VALUES (?, ?, ?, ?, ?, ?)',
+    const insertResult = await db.query(
+      `INSERT INTO menu_items 
+        (name, description, price, category, subcategory, image_url) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING *`,
       [name, description, price, category, subcategory, image_url]
     );
 
-    const [newItem] = await db.execute(
-      'SELECT * FROM menu_items WHERE id = ?',
-      [result.insertId]
-    );
-
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Menu item created successfully',
-      item: newItem[0]
+      item: insertResult.rows[0]
     });
   } catch (error) {
     console.error('Create menu item error:', error);
@@ -123,30 +120,23 @@ router.put('/:id', authenticateToken, requireStaff, async (req, res) => {
     const { id } = req.params;
     const { name, description, price, category, subcategory, is_available, image_url } = req.body;
 
-    // Check if item exists
-    const [existingItems] = await db.execute(
-      'SELECT * FROM menu_items WHERE id = ?',
-      [id]
-    );
-
-    if (existingItems.length === 0) {
+    const check = await db.query('SELECT * FROM menu_items WHERE id = $1', [id]);
+    if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    // Update item
-    await db.execute(
-      'UPDATE menu_items SET name = ?, description = ?, price = ?, category = ?, subcategory = ?, is_available = ?, image_url = ? WHERE id = ?',
+    await db.query(
+      `UPDATE menu_items 
+       SET name = $1, description = $2, price = $3, category = $4, subcategory = $5, is_available = $6, image_url = $7 
+       WHERE id = $8`,
       [name, description, price, category, subcategory, is_available, image_url, id]
     );
 
-    const [updatedItem] = await db.execute(
-      'SELECT * FROM menu_items WHERE id = ?',
-      [id]
-    );
+    const updated = await db.query('SELECT * FROM menu_items WHERE id = $1', [id]);
 
-    res.json({ 
+    res.json({
       message: 'Menu item updated successfully',
-      item: updatedItem[0]
+      item: updated.rows[0]
     });
   } catch (error) {
     console.error('Update menu item error:', error);
@@ -159,29 +149,23 @@ router.delete('/:id', authenticateToken, requireStaff, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if item exists
-    const [existingItems] = await db.execute(
-      'SELECT * FROM menu_items WHERE id = ?',
-      [id]
-    );
-
-    if (existingItems.length === 0) {
+    const check = await db.query('SELECT * FROM menu_items WHERE id = $1', [id]);
+    if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    // Check if item is used in any orders
-    const [orderItems] = await db.execute(
-      'SELECT COUNT(*) as count FROM order_items WHERE menu_item_id = ?',
+    const orders = await db.query(
+      'SELECT COUNT(*) AS count FROM order_items WHERE menu_item_id = $1',
       [id]
     );
 
-    if (orderItems[0].count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete menu item that is used in orders. Set it as unavailable instead.' 
+    if (parseInt(orders.rows[0].count) > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete menu item that is used in orders. Set it as unavailable instead.'
       });
     }
 
-    await db.execute('DELETE FROM menu_items WHERE id = ?', [id]);
+    await db.query('DELETE FROM menu_items WHERE id = $1', [id]);
 
     res.json({ message: 'Menu item deleted successfully' });
   } catch (error) {
@@ -195,24 +179,20 @@ router.patch('/:id/toggle-availability', authenticateToken, requireStaff, async 
   try {
     const { id } = req.params;
 
-    const [existingItems] = await db.execute(
-      'SELECT * FROM menu_items WHERE id = ?',
-      [id]
-    );
-
-    if (existingItems.length === 0) {
+    const result = await db.query('SELECT * FROM menu_items WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    const currentStatus = existingItems[0].is_available;
-    const newStatus = !currentStatus;
+    const current = result.rows[0].is_available;
+    const newStatus = !current;
 
-    await db.execute(
-      'UPDATE menu_items SET is_available = ? WHERE id = ?',
+    await db.query(
+      'UPDATE menu_items SET is_available = $1 WHERE id = $2',
       [newStatus, id]
     );
 
-    res.json({ 
+    res.json({
       message: `Menu item ${newStatus ? 'activated' : 'deactivated'} successfully`,
       is_available: newStatus
     });

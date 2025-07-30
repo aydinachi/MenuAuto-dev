@@ -1,4 +1,4 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 // Load environment variables
 if (process.env.NODE_ENV === 'production') {
   // Production: Railway will provide environment variables
@@ -9,26 +9,22 @@ if (process.env.NODE_ENV === 'production') {
   console.log('🔧 Using development environment variables');
 }
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'menuauto_db',
-  port: process.env.DB_PORT || 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 // Test database connection
 const testConnection = async () => {
   try {
-    const connection = await pool.getConnection();
+    const client = await pool.connect();
     console.log('✅ Database connected successfully');
-    connection.release();
+    client.release(); // vrati klijent u pool
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
-    console.log('Please make sure MySQL is running and the database exists');
+    console.log('Please make sure PostgreSQL is running and the database exists');
   }
 };
 

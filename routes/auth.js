@@ -16,10 +16,12 @@ router.post('/login', async (req, res) => {
     }
 
     // Get user from database
-    const [users] = await db.execute(
-      'SELECT * FROM users WHERE username = ?',
+    const userResult = await db.query(
+      'SELECT * FROM users WHERE username = $1',
       [username]
     );
+
+    const users = userResult.rows;
 
     if (users.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -58,10 +60,12 @@ router.post('/login', async (req, res) => {
 // Get current user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const [users] = await db.execute(
-      'SELECT id, username, full_name, role, created_at FROM users WHERE id = ?',
+    const userResult = await db.query(
+      'SELECT id, username, full_name, role, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
+
+    const users = userResult.rows;
 
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -89,10 +93,12 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     }
 
     // Get current user with password
-    const [users] = await db.execute(
-      'SELECT * FROM users WHERE id = ?',
+    const usersResult = await db.query(
+      'SELECT * FROM users WHERE id = $1',
       [req.user.id]
     );
+
+    const users = usersResult.rows;
 
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -110,8 +116,8 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password
-    await db.execute(
-      'UPDATE users SET password = ? WHERE id = ?',
+    await db.query(
+      'UPDATE users SET password = $1 WHERE id = $2',
       [hashedNewPassword, req.user.id]
     );
 

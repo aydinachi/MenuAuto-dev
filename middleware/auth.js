@@ -14,10 +14,12 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
     
     // Get user from database
-    const [users] = await db.execute(
-      'SELECT id, username, full_name, role FROM users WHERE id = ?',
+    const result = await db.query(
+      'SELECT id, username, full_name, role FROM users WHERE id = $1',
       [decoded.userId]
     );
+
+    const users = result.rows;
 
     if (users.length === 0) {
       return res.status(401).json({ error: 'Invalid token' });

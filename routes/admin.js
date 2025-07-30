@@ -6,44 +6,40 @@ const db = require('../config/database');
 // Get admin dashboard statistics
 router.get('/dashboard', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const connection = await db.getConnection();
-        
         // Get total revenue
-        const [revenueResult] = await connection.execute(`
+        const revenueResult = await db.query(`
             SELECT COALESCE(SUM(total_amount), 0) as total_revenue
             FROM orders 
             WHERE status = 'served' 
-            AND DATE(created_at) = CURDATE()
+            AND created_at::date = CURRENT_DATE
         `);
         
         // Get total orders today
-        const [ordersResult] = await connection.execute(`
+        const ordersResult = await db.query(`
             SELECT COUNT(*) as total_orders
             FROM orders 
-            WHERE DATE(created_at) = CURDATE()
+            WHERE created_at::date = CURRENT_DATE
         `);
         
         // Get active waiters
-        const [waitersResult] = await connection.execute(`
+        const waitersResult = await db.query(`
             SELECT COUNT(DISTINCT waiter_id) as active_waiters
             FROM orders 
-            WHERE DATE(created_at) = CURDATE()
+            WHERE created_at::date = CURRENT_DATE
         `);
         
         // Get low stock items
-        const [lowStockResult] = await connection.execute(`
+        const lowStockResult = await db.query(`
             SELECT COUNT(*) as low_stock_count
             FROM inventory 
             WHERE (received_quantity - used_quantity) <= min_quantity
         `);
-        
-        connection.release();
-        
+                
         res.json({
-            totalRevenue: parseFloat(revenueResult[0].total_revenue),
-            totalOrders: ordersResult[0].total_orders,
-            activeWaiters: waitersResult[0].active_waiters,
-            lowStockItems: lowStockResult[0].low_stock_count
+            totalRevenue: parseFloat(revenueResult.rows[0].total_revenue),
+            totalOrders: ordersResult.rows[0].total_orders,
+            activeWaiters: waitersResult.rows[0].active_waiters,
+            lowStockItems: lowStockResult.rows[0].low_stock_count
         });
         
     } catch (error) {
@@ -55,23 +51,19 @@ router.get('/dashboard', authenticateToken, requireAdmin, async (req, res) => {
 // Get sales chart data
 router.get('/charts/sales-time', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const connection = await db.getConnection();
-        
         // Get sales by hour for today
-        const [salesData] = await connection.execute(`
+        const salesData = await db.query(`
             SELECT 
-                HOUR(created_at) as hour,
+                EXTRACT(HOUR FROM created_at) as hour,
                 COUNT(*) as orders,
                 SUM(total_amount) as revenue
             FROM orders 
-            WHERE DATE(created_at) = CURDATE()
-            GROUP BY HOUR(created_at)
+            WHERE created_at::date = CURRENT_DATE
+            GROUP BY hour
             ORDER BY hour
         `);
-        
-        connection.release();
-        
-        res.json(salesData);
+                
+        res.json(salesData.rows);
         
     } catch (error) {
         console.error('Sales chart error:', error);
@@ -82,9 +74,8 @@ router.get('/charts/sales-time', authenticateToken, requireAdmin, async (req, re
 // Get top selling items
 router.get('/charts/top-items', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const connection = await db.getConnection();
         
-        const [topItems] = await connection.execute(`
+        const topItems = await db.query(`
             SELECT 
                 mi.name,
                 SUM(oi.quantity) as total_quantity,
@@ -93,15 +84,13 @@ router.get('/charts/top-items', authenticateToken, requireAdmin, async (req, res
             JOIN menu_items mi ON oi.menu_item_id = mi.id
             JOIN orders o ON oi.order_id = o.id
             WHERE o.status = 'served'
-            AND DATE(o.created_at) = CURDATE()
+            AND o.created_at::date = CURRENT_DATE
             GROUP BY mi.id, mi.name
             ORDER BY total_quantity DESC
             LIMIT 10
         `);
-        
-        connection.release();
-        
-        res.json(topItems);
+                
+        res.json(topItems.rows);
         
     } catch (error) {
         console.error('Top items chart error:', error);
@@ -111,10 +100,8 @@ router.get('/charts/top-items', authenticateToken, requireAdmin, async (req, res
 
 // Get staff performance
 router.get('/staff/performance', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const connection = await db.getConnection();
-        
-        const [staffStats] = await connection.execute(`
+    try {        
+        const staffStats = await db.query(`
             SELECT 
                 u.username,
                 u.full_name as name,
@@ -123,15 +110,13 @@ router.get('/staff/performance', authenticateToken, requireAdmin, async (req, re
                 AVG(o.total_amount) as avg_order_value
             FROM users u
             LEFT JOIN orders o ON u.id = o.waiter_id 
-            AND DATE(o.created_at) = CURDATE()
+            AND o.created_at::date = CURRENT_DATE
             WHERE u.role = 'waiter'
             GROUP BY u.id, u.username, u.full_name
             ORDER BY total_revenue DESC
         `);
-        
-        connection.release();
-        
-        res.json(staffStats);
+                
+        res.json(staffStats.rows);
         
     } catch (error) {
         console.error('Staff performance error:', error);
@@ -141,10 +126,8 @@ router.get('/staff/performance', authenticateToken, requireAdmin, async (req, re
 
 // Inventory management routes
 router.get('/inventory', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const connection = await db.getConnection();
-        
-        const [inventory] = await connection.execute(`
+    try {        
+        const inventory = await db.query(`
             SELECT 
                 id, name, category, unit, 
                 received_quantity, used_quantity, 
@@ -157,10 +140,8 @@ router.get('/inventory', authenticateToken, requireAdmin, async (req, res) => {
             FROM inventory
             ORDER BY name
         `);
-        
-        connection.release();
-        
-        res.json(inventory);
+                
+        res.json(inventory.rows);
         
     } catch (error) {
         console.error('Get inventory error:', error);
@@ -171,19 +152,15 @@ router.get('/inventory', authenticateToken, requireAdmin, async (req, res) => {
 router.post('/inventory', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { name, category, unit, received_quantity, min_quantity, price_per_unit } = req.body;
-        
-        const connection = await db.getConnection();
-        
-        const [result] = await connection.execute(`
+                
+        const result = await db.query(`
             INSERT INTO inventory (name, category, unit, received_quantity, used_quantity, min_quantity, price_per_unit)
-            VALUES (?, ?, ?, ?, 0, ?, ?)
+            VALUES ($1, $2, $3, $4, 0, $5, $6)
         `, [name, category, unit, received_quantity, min_quantity, price_per_unit]);
-        
-        connection.release();
-        
+                
         res.status(201).json({ 
             message: 'Inventory item added successfully',
-            id: result.insertId 
+            id: result.rows[0].id
         });
         
     } catch (error) {
@@ -196,19 +173,15 @@ router.put('/inventory/:id', authenticateToken, requireAdmin, async (req, res) =
     try {
         const { id } = req.params;
         const { received_quantity, used_quantity, min_quantity } = req.body;
-        
-        const connection = await db.getConnection();
-        
-        await connection.execute(`
+                
+        await db.query(`
             UPDATE inventory 
-            SET received_quantity = received_quantity + ?,
-                used_quantity = used_quantity + ?,
-                min_quantity = ?
-            WHERE id = ?
+            SET received_quantity = received_quantity + $1,
+                used_quantity = used_quantity + $2,
+                min_quantity = $3
+            WHERE id = $4
         `, [received_quantity || 0, used_quantity || 0, min_quantity, id]);
-        
-        connection.release();
-        
+                
         res.json({ message: 'Inventory updated successfully' });
         
     } catch (error) {
@@ -221,11 +194,9 @@ router.put('/inventory/:id', authenticateToken, requireAdmin, async (req, res) =
 router.get('/bar-book/:date', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { date } = req.params;
-        
-        const connection = await db.getConnection();
-        
+                
         // Get drink sales for the date
-        const [drinkSales] = await connection.execute(`
+        const drinkSalesResult = await db.query(`
             SELECT 
                 mi.name,
                 mi.price,
@@ -235,14 +206,14 @@ router.get('/bar-book/:date', authenticateToken, requireAdmin, async (req, res) 
             JOIN menu_items mi ON oi.menu_item_id = mi.id
             JOIN orders o ON oi.order_id = o.id
             WHERE mi.category = 'drink'
-            AND DATE(o.created_at) = ?
+            AND o.created_at::date = $1
             AND o.status = 'served'
             GROUP BY mi.id, mi.name, mi.price
             ORDER BY total_quantity DESC
         `, [date]);
         
         // Get inventory usage for drinks
-        const [inventoryUsage] = await connection.execute(`
+        const inventoryUsageResult = await db.query(`
             SELECT 
                 name,
                 unit,
@@ -251,11 +222,12 @@ router.get('/bar-book/:date', authenticateToken, requireAdmin, async (req, res) 
                 (used_quantity * price_per_unit) as total_cost
             FROM inventory
             WHERE category = 'drink'
-            AND DATE(updated_at) = ?
+            AND updated_at::date = $1
         `, [date]);
         
-        connection.release();
-        
+        const drinkSales = drinkSalesResult.rows;
+        const inventoryUsage = inventoryUsageResult.rows;
+
         res.json({
             date,
             drinkSales,
