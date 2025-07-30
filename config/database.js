@@ -1,5 +1,13 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config({ path: '../config.env' });
+// Load environment variables
+if (process.env.NODE_ENV === 'production') {
+  // Production: Railway will provide environment variables
+  console.log('🔧 Using production environment variables');
+} else {
+  // Development: Load from config.env
+  require('dotenv').config({ path: '../config.env' });
+  console.log('🔧 Using development environment variables');
+}
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',

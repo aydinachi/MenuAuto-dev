@@ -102,9 +102,14 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 3001;
 
+// Start server
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Visit http://localhost:${PORT} to access the application`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Visit http://localhost:${PORT} to access the application`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+// Export for Railway/Vercel
+module.exports = app;
 
 module.exports = { app, server, io }; 
