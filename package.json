@@ -9,7 +9,8 @@
     "build": "echo 'Build completed'",
     "init-db": "node scripts/init-database.js",
     "fix-db": "node scripts/fix-database.js",
-    "create-test-data": "node scripts/create-test-data.js"
+    "create-test-data": "node scripts/create-test-data.js",
+    "update-pizza": "node scripts/update-pizza-menu.js"
   },
   "dependencies": {
     "express": "^4.18.2",

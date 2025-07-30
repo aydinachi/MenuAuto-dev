@@ -219,8 +219,7 @@ const createDatabase = async () => {
         ('Whiskey', 'Whiskey sa ledom', 'drink', 'alkohol', 7.00, true),
         
         -- Food - Pizza (Demo)
-        ('Pizza Margherita', 'Klasična pizza sa paradajzom i mozzarellom', 'food', 'pizza', 12.00, true),
-        ('Pizza Capricciosa', 'Pizza sa šunkom, pečurkama i maslinama', 'food', 'pizza', 15.00, true),
+        ('Pizza', 'Izaberite varijaciju: Margherita, Hawaii, Pepperoni', 'food', 'pizza', 12.00, true),
         
         -- Food - Burgers (Demo)
         ('Classic Burger', 'Klasični burger sa pomfritom', 'food', 'burger', 14.00, true),

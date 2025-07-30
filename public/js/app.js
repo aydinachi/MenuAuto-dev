@@ -1072,10 +1072,8 @@ function showItemOptionsModal() {
         variationSelect.innerHTML = `
             <option value="">Odaberite varijaciju</option>
             <option value="Margherita">Margherita</option>
-            <option value="Capricciosa">Capricciosa</option>
-            <option value="Quattro Stagioni">Quattro Stagioni</option>
-            <option value="Pepperoni">Pepperoni</option>
             <option value="Hawaii">Hawaii</option>
+            <option value="Pepperoni">Pepperoni</option>
         `;
     } else if (selectedItem.subcategory === 'kafa') {
         variationSection.style.display = 'block';
@@ -2065,8 +2063,7 @@ function getItemImage(item) {
             'whiskey': 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=300&h=200&fit=crop',
             
             // Food - Pizza
-            'pizza margherita': 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=300&h=200&fit=crop',
-            'pizza capricciosa': 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=300&h=200&fit=crop',
+            'pizza': 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=300&h=200&fit=crop',
             
             // Food - Burgers
             'classic burger': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&h=200&fit=crop',
