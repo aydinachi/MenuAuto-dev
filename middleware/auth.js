@@ -6,26 +6,36 @@ const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+  console.log('🔐 Auth Debug - Token:', token ? token.substring(0, 50) + '...' : 'No token');
+  console.log('🔐 Auth Debug - JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
+
   if (!token) {
+    console.log('❌ Auth Debug - No token provided');
     return res.status(401).json({ error: 'Access token required' });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    console.log('✅ Auth Debug - Token verified:', decoded);
     
     // Get user from database
     const [users] = await db.execute(
-      'SELECT id, username, full_name, role FROM users WHERE id = ?',
+      'SELECT id, username, name, role FROM users WHERE id = ?',
       [decoded.userId]
     );
 
+    console.log('🔍 Auth Debug - Database users found:', users.length);
+
     if (users.length === 0) {
+      console.log('❌ Auth Debug - No user found in database');
       return res.status(401).json({ error: 'Invalid token' });
     }
 
     req.user = users[0];
+    console.log('✅ Auth Debug - User authenticated:', req.user);
     next();
   } catch (error) {
+    console.log('❌ Auth Debug - Token verification failed:', error.message);
     return res.status(403).json({ error: 'Invalid token' });
   }
 };

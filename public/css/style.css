@@ -312,7 +312,7 @@ body {
     background-color: #f8f9fa;
 }
 
-/* Responsive Design */
+/* Mobile-First Responsive Design */
 @media (max-width: 768px) {
     .auth-screen .card-body {
         padding: 2rem 1.5rem;
@@ -331,23 +331,310 @@ body {
     }
 }
 
+/* Mobile Optimizations */
 @media (max-width: 576px) {
+    /* Auth Screen */
     .auth-screen .card-body {
         padding: 1.5rem 1rem;
     }
     
+    /* Navigation */
+    .navbar {
+        padding: 0.5rem 1rem;
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    /* Dashboard Layout */
+    .dashboard-section {
+        padding: 0.5rem;
+        min-height: calc(100vh - 70px);
+    }
+    
+    /* Menu Items - Mobile Grid */
+    .menu-items-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 0.5rem;
+    }
+    
+    .menu-item {
+        margin-bottom: 0;
+    }
+    
+    .menu-item .card-img-top {
+        height: 80px;
+    }
+    
+    .menu-item .card-body {
+        padding: 0.5rem;
+    }
+    
     .menu-item .card-title {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+        line-height: 1.1;
+        margin-bottom: 0.25rem;
     }
     
     .menu-item .card-text {
+        font-size: 0.65rem;
+        line-height: 1.2;
+        margin-bottom: 0.25rem;
+    }
+    
+    .menu-item .price {
+        font-size: 0.9rem;
+    }
+    
+    .menu-item .category-badge {
+        font-size: 0.6rem;
+        padding: 0.15rem 0.4rem;
+    }
+    
+    /* Order Section - Mobile Layout */
+    .order-section {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 2px solid #dee2e6;
+        z-index: 1000;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    
+    .order-section .card {
+        border: none;
+        border-radius: 0;
+        margin: 0;
+    }
+    
+    .order-section .card-header {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .order-section .card-body {
+        padding: 0.75rem;
+    }
+    
+    /* Order Items - Mobile */
+    .order-item {
+        padding: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .order-item .item-name {
+        font-size: 0.85rem;
+    }
+    
+    .order-item .item-details {
         font-size: 0.75rem;
+    }
+    
+    .quantity-control {
+        gap: 0.25rem;
+    }
+    
+    .quantity-btn {
+        width: 25px;
+        height: 25px;
+        font-size: 0.8rem;
+    }
+    
+    .quantity-display {
+        min-width: 25px;
+        font-size: 0.8rem;
+    }
+    
+    /* Table Selection - Mobile */
+    .table-selection-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    
+    .table-box {
+        min-height: 50px;
+        padding: 8px 4px;
+    }
+    
+    .table-number {
+        font-size: 1rem;
+    }
+    
+    /* Menu Categories - Mobile */
+    .menu-category-filter {
+        margin-bottom: 0.5rem;
+        padding: 0 0.5rem;
+    }
+    
+    .menu-category-filter .btn-group {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .menu-category-filter .btn {
+        margin: 1px;
+        font-size: 0.75rem;
+        padding: 6px 12px;
+        border-radius: 15px;
+    }
+    
+    /* Floating Action Button for Order */
+    
+    
+    /* Order Summary - Mobile */
+    .order-summary {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        border-top: 1px solid #dee2e6;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+    }
+    
+    .order-total {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0d6efd;
+    }
+    
+    /* Send Order Button - Mobile */
+    .send-order-btn {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        margin-top: 0.5rem;
+    }
+    
+    /* Desktop elements - show by default */
+
+/* Mobile elements - hide by default */
+    
+    /* Adjust main content area */
+    .main-content {
+        padding-bottom: 60vh; /* Space for order section */
+    }
+    
+    /* Kitchen/Bar Orders - Mobile */
+    .order-card {
+        margin-bottom: 0.5rem;
+    }
+    
+    .order-card .card-header {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .order-card .card-body {
+        padding: 0.75rem;
     }
     
     .order-item-row {
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.5rem;
+        gap: 0.25rem;
+        padding: 0.5rem 0;
+    }
+    
+    /* Status buttons - Mobile */
+    .status-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+        border-radius: 6px;
+    }
+}
+
+/* Extra Small Mobile Devices */
+@media (max-width: 375px) {
+    .menu-items-container {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    
+    .table-selection-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .menu-category-filter .btn {
+        font-size: 0.7rem;
+        padding: 5px 10px;
+    }
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 576px) {
+    /* Better touch targets */
+    .btn {
+        min-height: 44px;
+        padding: 0.75rem 1rem;
+    }
+    
+    .quantity-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    /* Improved scrolling */
+    .order-section {
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Better spacing */
+    .card-body {
+        padding: 1rem;
+    }
+    
+    /* Improved menu grid */
+    .menu-items-container {
+        margin: 0 -0.5rem;
+    }
+    
+    /* Better table selection */
+    .table-box {
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Improved order items */
+    .order-item {
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+    }
+    
+    /* Better navigation */
+    .navbar {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Improved modals */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-content {
+        border-radius: 12px;
+    }
+    
+    /* Better form controls */
+    .form-control {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 0.75rem;
+    }
+    
+    /* Improved buttons */
+    .btn-group .btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
     }
 }
 

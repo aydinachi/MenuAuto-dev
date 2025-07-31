@@ -17,5 +17,5 @@ RUN npm run build
 # Expose port
 EXPOSE 3001
 
-# Start the application
-CMD ["npm", "start"] 
+# Initialize database, fix passwords, reset JWT, verify JWT, clean duplicates, and start the application
+CMD ["sh", "-c", "npm run init-railway-db && npm run fix-passwords && npm run reset-jwt && npm run verify-jwt && npm run clean-duplicates && npm run migrate-shifts && npm start"] 

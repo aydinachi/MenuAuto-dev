@@ -118,7 +118,34 @@ function setupEventListeners() {
 }
 
 // Global functions for buttons
-function showReports() {
+async function showReports() {
+    try {
+        // Load waiters for filter
+        const response = await fetch('/api/shifts/waiters', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const waiterFilter = document.getElementById('waiterFilter');
+            
+            // Clear existing options
+            waiterFilter.innerHTML = '<option value="">Svi konobari</option>';
+            
+            // Add waiter options
+            data.waiters.forEach(waiter => {
+                const option = document.createElement('option');
+                option.value = waiter.id;
+                option.textContent = waiter.name;
+                waiterFilter.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading waiters for filter:', error);
+    }
+    
     // Show reports modal
     const reportsModal = new bootstrap.Modal(document.getElementById('reportsModal'));
     reportsModal.show();
@@ -146,7 +173,11 @@ async function startNewShift() {
         const data = await response.json();
 
         if (response.ok) {
-            showToast('Nova smjena uspješno započeta!', 'success');
+            let message = `Nova smjena uspješno započeta za ${data.waiterName}!`;
+            if (data.reportGenerated) {
+                message += ' Izvještaj za prethodnu smjenu je generisan.';
+            }
+            showToast(message, 'success');
             if (newShiftModal) {
                 newShiftModal.hide();
             }
@@ -266,7 +297,7 @@ function showMainApp() {
 
 function setupUserInterface() {
     // Set user name
-    userName.textContent = currentUser.full_name;
+            userName.textContent = currentUser.name;
     
     // Setup navigation based on user role
     setupNavigation();
@@ -574,6 +605,7 @@ async function loadReports() {
         const dateFilter = document.getElementById('dateFilter').value;
         const startDateFilter = document.getElementById('startDateFilter').value;
         const endDateFilter = document.getElementById('endDateFilter').value;
+        const waiterFilter = document.getElementById('waiterFilter').value;
 
         let url = '/api/shifts/reports';
         const params = new URLSearchParams();
@@ -583,6 +615,10 @@ async function loadReports() {
         } else if (startDateFilter && endDateFilter) {
             params.append('start_date', startDateFilter);
             params.append('end_date', endDateFilter);
+        }
+        
+        if (waiterFilter) {
+            params.append('waiter_id', waiterFilter);
         }
 
         if (params.toString()) {
@@ -625,10 +661,12 @@ function renderReports(reports) {
                     <div class="col-md-3">
                         <h6 class="card-title">Datum: ${new Date(report.report_date).toLocaleDateString()}</h6>
                         <p class="text-muted">${report.shift_start} - ${report.shift_end}</p>
+                        <p class="text-muted"><strong>Konobar:</strong> ${report.waiter_name || 'N/A'}</p>
                     </div>
                     <div class="col-md-3">
                         <p class="mb-1"><strong>Ukupno narudžbi:</strong> ${report.total_orders}</p>
                         <p class="mb-1"><strong>Ukupan prihod:</strong> ${parseFloat(report.total_revenue).toFixed(2)} KM</p>
+                        <p class="mb-1"><strong>Otpisani prihod:</strong> ${parseFloat(report.total_cancelled_revenue || 0).toFixed(2)} KM</p>
                     </div>
                     <div class="col-md-3">
                         <p class="mb-1"><strong>Otpisane narudžbe:</strong> ${report.total_cancelled_orders}</p>
@@ -715,59 +753,7 @@ function exportReport() {
     showToast('Funkcija izvoza će biti implementirana uskoro', 'info');
 }
 
-// Rendering functions
-function renderMenuItems() {
-    if (!menuItemsContainer) {
-        console.error('menuItemsContainer not found');
-        return;
-    }
-    
-    menuItemsContainer.innerHTML = '';
-    
-    if (menuItems.length === 0) {
-        menuItemsContainer.innerHTML = `
-            <div class="col-12">
-                <div class="empty-state">
-                    <i class="bi bi-list-ul"></i>
-                    <h5>Nema dostupnih stavki</h5>
-                    <p>Meni je trenutno prazan</p>
-                </div>
-            </div>
-        `;
-        return;
-    }
-    
-    menuItems.forEach(item => {
-        const menuItemElement = createMenuItemElement(item);
-        menuItemsContainer.appendChild(menuItemElement);
-    });
-}
-
-function createMenuItemElement(item) {
-    const col = document.createElement('div');
-    col.className = 'col-md-6 col-lg-4 col-xl-3';
-    
-    col.innerHTML = `
-        <div class="card menu-item" data-item-id="${item.id}" onclick="addToOrder(${item.id})">
-            <div class="card-img-top d-flex align-items-center justify-content-center" style="height: 120px; background-color: #f8f9fa;">
-                <i class="bi ${item.category === 'food' ? 'bi-egg-fried' : 'bi-cup-straw'}" style="font-size: 3rem; color: #6c757d;"></i>
-            </div>
-            <span class="badge category-badge ${item.category === 'food' ? 'bg-success' : 'bg-info'}">
-                ${item.category === 'food' ? 'Hrana' : 'Piće'}
-            </span>
-            <div class="card-body">
-                <h6 class="card-title">${item.name}</h6>
-                <p class="card-text">${item.description || ''}</p>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="price">${parseFloat(item.price).toFixed(2)} KM</span>
-                    <small class="text-muted">${item.subcategory || ''}</small>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    return col;
-}
+// Rendering functions - OLD VERSION REMOVED
 
 function renderMyOrders(orders) {
     const container = document.getElementById('myOrders');
@@ -1348,6 +1334,60 @@ async function updateOrderItemStatus(orderId, itemId, status, reason = '') {
         }
     } catch (error) {
         showToast('Greška pri ažuriranju statusa', 'error');
+    }
+}
+
+// Cancel individual order item
+async function cancelOrderItem(orderId, itemId) {
+    try {
+        const reason = prompt('Razlog otpisa (opciono):');
+        if (reason === null) return; // User cancelled
+        
+        const response = await fetch(`/api/orders/${orderId}/items/${itemId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ status: 'cancelled', reason })
+        });
+        
+        if (response.ok) {
+            showToast('Stavka otpisana', 'success');
+            refreshOrders();
+        } else {
+            const errorData = await response.json();
+            showToast(errorData.error || 'Greška pri otpisu', 'error');
+        }
+    } catch (error) {
+        showToast('Greška pri otpisu stavke', 'error');
+    }
+}
+
+// Cancel entire order
+async function cancelOrder(orderId) {
+    try {
+        const reason = prompt('Razlog otpisa narudžbe (opciono):');
+        if (reason === null) return; // User cancelled
+        
+        const response = await fetch(`/api/orders/${orderId}/cancel`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ reason })
+        });
+        
+        if (response.ok) {
+            showToast('Narudžba otpisana', 'success');
+            refreshOrders();
+        } else {
+            const errorData = await response.json();
+            showToast(errorData.error || 'Greška pri otpisu', 'error');
+        }
+    } catch (error) {
+        showToast('Greška pri otpisu narudžbe', 'error');
     }
 }
 
@@ -1997,6 +2037,19 @@ function renderMenuItems(items) {
     const container = document.getElementById('menuContainer');
     if (!container) return;
 
+    if (items.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="empty-state">
+                    <i class="bi bi-list-ul"></i>
+                    <h5>Nema dostupnih stavki</h5>
+                    <p>Meni je trenutno prazan</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
     container.innerHTML = items.map(item => createMenuItemElement(item)).join('');
 }
 
@@ -2128,3 +2181,29 @@ function getItemImage(item) {
             return 'https://images.unsplash.com/photo-1546173159-315724a31696?w=300&h=200&fit=crop';
         }
     }
+
+// Add debug logging for JWT token
+const debugJWTToken = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        console.log('🔐 Current JWT Token:', token.substring(0, 50) + '...');
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            console.log('🔍 Token payload:', payload);
+            console.log('📅 Token issued at:', new Date(payload.iat * 1000));
+            console.log('⏰ Token expires at:', new Date(payload.exp * 1000));
+        } catch (error) {
+            console.error('❌ Error parsing token:', error);
+        }
+    } else {
+        console.log('❌ No JWT token found in localStorage');
+    }
+};
+
+// Call debug function on page load
+document.addEventListener('DOMContentLoaded', () => {
+    debugJWTToken();
+});
+
+
+

@@ -40,6 +40,27 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    // If user is a waiter, create initial shift if none exists for today
+    if (user.role === 'waiter') {
+      try {
+        const [existingShifts] = await db.execute(`
+          SELECT id FROM shift_sessions 
+          WHERE waiter_id = ? AND DATE(shift_date) = CURDATE()
+        `, [user.id]);
+        
+        if (existingShifts.length === 0) {
+          await db.execute(`
+            INSERT INTO shift_sessions (shift_date, waiter_id, shift_start, is_active, created_by)
+            VALUES (CURDATE(), ?, CURRENT_TIMESTAMP, TRUE, ?)
+          `, [user.id, user.id]);
+          console.log(`Created initial shift for waiter ${user.name}`);
+        }
+      } catch (error) {
+        console.error('Error creating initial shift:', error);
+        // Don't fail login if shift creation fails
+      }
+    }
+
     // Return user data (without password) and token
     const { password: _, ...userWithoutPassword } = user;
     
@@ -59,7 +80,7 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const [users] = await db.execute(
-      'SELECT id, username, full_name, role, created_at FROM users WHERE id = ?',
+      'SELECT id, username, name, role, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 

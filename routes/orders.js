@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../config/database');
-const { authenticateToken, requireWaiter, requireCook, requireBartender } = require('../middleware/auth');
+const { authenticateToken, requireWaiter, requireCook, requireBartender, requireStaff } = require('../middleware/auth');
 // Socket.IO is available globally
 
 const router = express.Router();
@@ -12,7 +12,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const userRole = req.user.role;
     
     let query = `
-      SELECT o.*, u.full_name as waiter_name,
+      SELECT o.*, u.name as waiter_name,
              GROUP_CONCAT(
                CONCAT(mi.name, ' (', oi.quantity, ')') SEPARATOR ', '
              ) as items_summary
@@ -90,7 +90,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     // Get order details
     const [orders] = await db.execute(`
-      SELECT o.*, u.full_name as waiter_name
+      SELECT o.*, u.name as waiter_name
       FROM orders o
       LEFT JOIN users u ON o.waiter_id = u.id
       WHERE o.id = ?
@@ -148,9 +148,9 @@ router.post('/', authenticateToken, requireWaiter, async (req, res) => {
     
     // Create order
     const [orderResult] = await connection.execute(`
-      INSERT INTO orders (table_number, waiter_id, status, notes, total_amount)
-      VALUES (?, ?, 'pending', ?, 0)
-    `, [table_number, req.user.id, notes || '']);
+      INSERT INTO orders (table_number, waiter_id, status, total_amount)
+      VALUES (?, ?, 'pending', 0)
+    `, [table_number, req.user.id]);
     
     const orderId = orderResult.insertId;
     let totalAmount = 0;
@@ -171,13 +171,12 @@ router.post('/', authenticateToken, requireWaiter, async (req, res) => {
       totalAmount += itemTotal;
       
       await connection.execute(`
-        INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, notes, size, variation)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO order_items (order_id, menu_item_id, quantity, notes, size, variation)
+        VALUES (?, ?, ?, ?, ?, ?)
       `, [
         orderId, 
         item.menu_item_id, 
         item.quantity, 
-        itemPrice,
         item.notes || '',
         item.size || null,
         item.variation || null
@@ -194,7 +193,7 @@ router.post('/', authenticateToken, requireWaiter, async (req, res) => {
     
     // Get complete order with items
     const [orders] = await connection.execute(`
-      SELECT o.*, u.full_name as waiter_name
+      SELECT o.*, u.name as waiter_name
       FROM orders o
       LEFT JOIN users u ON o.waiter_id = u.id
       WHERE o.id = ?
@@ -306,9 +305,9 @@ router.patch('/:orderId/items/:itemId/status', authenticateToken, async (req, re
       return res.status(400).json({ error: 'Invalid status' });
     }
     
-    // Check permissions
-    if (status === 'cancelled' && userRole !== 'waiter' && userRole !== 'admin') {
-      return res.status(403).json({ error: 'Only waiters and admins can cancel items' });
+    // Check permissions - allow waiters, cooks, bartenders and admins to cancel items
+    if (status === 'cancelled' && userRole !== 'waiter' && userRole !== 'cook' && userRole !== 'bartender' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Only waiters, cooks, bartenders and admins can cancel items' });
     }
     
     // Update item status
@@ -381,15 +380,15 @@ router.patch('/:orderId/items/:itemId/status', authenticateToken, async (req, re
 });
 
 // Cancel order
-router.put('/:id/cancel', authenticateToken, requireWaiter, async (req, res) => {
+router.put('/:id/cancel', authenticateToken, requireStaff, async (req, res) => {
     try {
         const orderId = req.params.id;
-        const waiterId = req.user.id;
+        const userId = req.user.id;
         
-        // Check if order exists and belongs to this waiter
+        // Check if order exists
         const [orders] = await db.execute(
-            'SELECT * FROM orders WHERE id = ? AND waiter_id = ?',
-            [orderId, waiterId]
+            'SELECT * FROM orders WHERE id = ?',
+            [orderId]
         );
         
         if (orders.length === 0) {
@@ -407,7 +406,7 @@ router.put('/:id/cancel', authenticateToken, requireWaiter, async (req, res) => 
         // Update all order items to cancelled
         await db.execute(
             'UPDATE order_items SET status = ?, cancelled_at = NOW(), cancelled_by = ? WHERE order_id = ?',
-            ['cancelled', waiterId, orderId]
+            ['cancelled', userId, orderId]
         );
         
         // Emit socket event to notify other users
@@ -415,7 +414,7 @@ router.put('/:id/cancel', authenticateToken, requireWaiter, async (req, res) => 
             global.io.to('waiter').to('cook').to('bartender').emit('order-cancelled', {
                 order_id: orderId,
                 table_number: order.table_number,
-                waiter_id: waiterId
+                cancelled_by: userId
             });
         }
         

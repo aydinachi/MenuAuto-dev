@@ -117,7 +117,7 @@ router.get('/staff/performance', authenticateToken, requireAdmin, async (req, re
         const [staffStats] = await connection.execute(`
             SELECT 
                 u.username,
-                u.full_name as name,
+                u.name,
                 COUNT(o.id) as total_orders,
                 SUM(o.total_amount) as total_revenue,
                 AVG(o.total_amount) as avg_order_value
@@ -125,7 +125,7 @@ router.get('/staff/performance', authenticateToken, requireAdmin, async (req, re
             LEFT JOIN orders o ON u.id = o.waiter_id 
             AND DATE(o.created_at) = CURDATE()
             WHERE u.role = 'waiter'
-            GROUP BY u.id, u.username, u.full_name
+            GROUP BY u.id, u.username, u.name
             ORDER BY total_revenue DESC
         `);
         

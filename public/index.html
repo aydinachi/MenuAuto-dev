@@ -191,7 +191,7 @@
                         </div>
                     </div>
                     
-                    <div class="col-md-4">
+                    <div class="col-md-4 ">
                         <div class="card">
                             <div class="card-header">
                                 <h5 class="mb-0">
@@ -654,7 +654,7 @@
                 </div>
                 <div class="modal-body">
                     <p>Da li ste sigurni da želite započeti novu smjenu?</p>
-                    <p class="text-warning"><i class="bi bi-exclamation-triangle"></i> Ovo će generisati izvještaj prethodne smjene i resetovati sve aktivne narudžbe.</p>
+                    <p class="text-warning"><i class="bi bi-exclamation-triangle"></i> Ovo će generisati izvještaj prethodne smjene i započeti novu smjenu za vas.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Otkaži</button>
@@ -677,17 +677,23 @@
                     <div class="mb-3">
                         <h6>Filteri</h6>
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="dateFilter" class="form-label">Datum:</label>
                                 <input type="date" class="form-control" id="dateFilter">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="startDateFilter" class="form-label">Od datuma:</label>
                                 <input type="date" class="form-control" id="startDateFilter">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="endDateFilter" class="form-label">Do datuma:</label>
                                 <input type="date" class="form-control" id="endDateFilter">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="waiterFilter" class="form-label">Konobar:</label>
+                                <select class="form-select" id="waiterFilter">
+                                    <option value="">Svi konobari</option>
+                                </select>
                             </div>
                         </div>
                         <button class="btn btn-primary mt-2" onclick="loadReports()">

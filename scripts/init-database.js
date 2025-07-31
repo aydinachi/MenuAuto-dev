@@ -88,52 +88,65 @@ const createDatabase = async () => {
         )
     `);
 
-    // Create daily_reports table
-    await connection.query(`
-        CREATE TABLE IF NOT EXISTS daily_reports (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            report_date DATE NOT NULL,
-            shift_start TIME NOT NULL,
-            shift_end TIME NOT NULL,
-            total_orders INT DEFAULT 0,
-            total_revenue DECIMAL(10,2) DEFAULT 0,
-            total_cancelled_orders INT DEFAULT 0,
-            total_cancelled_revenue DECIMAL(10,2) DEFAULT 0,
-            created_by INT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        )
-    `);
-
-    // Create report_items table for detailed reporting
-    await connection.query(`
-        CREATE TABLE IF NOT EXISTS report_items (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            report_id INT NOT NULL,
-            menu_item_id INT NOT NULL,
-            item_name VARCHAR(255) NOT NULL,
-            category VARCHAR(50) NOT NULL,
-            quantity_sold INT DEFAULT 0,
-            quantity_cancelled INT DEFAULT 0,
-            total_revenue DECIMAL(10,2) DEFAULT 0,
-            cancelled_revenue DECIMAL(10,2) DEFAULT 0,
-            FOREIGN KEY (report_id) REFERENCES daily_reports(id) ON DELETE CASCADE,
-            FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
-        )
-    `);
-
     // Create shift_sessions table
-    await connection.query(`
-        CREATE TABLE IF NOT EXISTS shift_sessions (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            shift_date DATE NOT NULL,
-            shift_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            shift_end TIMESTAMP NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_by INT NOT NULL,
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        )
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS shift_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        shift_date DATE NOT NULL,
+        waiter_id INT NOT NULL,
+        shift_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        shift_end TIMESTAMP NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        total_orders INT DEFAULT 0,
+        total_revenue DECIMAL(10,2) DEFAULT 0,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (waiter_id) REFERENCES users(id),
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
     `);
+    console.log('✅ Shift sessions table created');
+
+    // Create daily_reports table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS daily_reports (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        report_date DATE NOT NULL,
+        shift_id INT NOT NULL,
+        waiter_id INT NOT NULL,
+        shift_start TIME NOT NULL,
+        shift_end TIME NOT NULL,
+        total_orders INT DEFAULT 0,
+        total_revenue DECIMAL(10,2) DEFAULT 0,
+        total_cancelled_revenue DECIMAL(10,2) DEFAULT 0,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (shift_id) REFERENCES shift_sessions(id),
+        FOREIGN KEY (waiter_id) REFERENCES users(id),
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    `);
+    console.log('✅ Daily reports table created');
+
+    // Create report_items table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS report_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        report_id INT NOT NULL,
+        menu_item_id INT NOT NULL,
+        item_name VARCHAR(100) NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        subcategory VARCHAR(50),
+        quantity_sold INT DEFAULT 0,
+        quantity_cancelled INT DEFAULT 0,
+        total_revenue DECIMAL(10,2) DEFAULT 0,
+        cancelled_revenue DECIMAL(10,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (report_id) REFERENCES daily_reports(id) ON DELETE CASCADE,
+        FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+      )
+    `);
+    console.log('✅ Report items table created');
 
     // Create inventory table
     await connection.query(`
